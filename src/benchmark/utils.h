@@ -193,9 +193,12 @@ long long load_text_data(T *&array, long long length, const std::string &file_pa
     return temp_keys.size();
 }
 
-template<class T>
-T *get_search_keys(T array[], int num_keys, int num_searches, size_t *seed = nullptr) {
+template <class T>
+T *get_search_keys(T array[], size_t num_keys, size_t num_searches, size_t *seed = nullptr)
+{
     auto *keys = new T[num_searches];
+
+    std::cout << "Search keys allocated" << std::endl;
 
 #pragma omp parallel
     {
@@ -203,17 +206,18 @@ T *get_search_keys(T array[], int num_keys, int num_searches, size_t *seed = nul
         if (seed) {
             gen.seed(*seed + omp_get_thread_num());
         }
-        std::uniform_int_distribution<int> dis(0, num_keys - 1);
+        // std::uniform_int_distribution<int> dis(0, num_keys - 1);
+        std::uniform_real_distribution<double> dis(0.0, 1.0);
 #pragma omp for
-        for (int i = 0; i < num_searches; i++) {
-            int pos = dis(gen);
+        for (size_t i = 0; i < num_searches; i++)
+        {
+            size_t pos = floor(dis(gen) * num_keys);
             keys[i] = array[pos];
         }
     }
 
     return keys;
 }
-
 
 bool file_exists(const std::string &str) {
     std::ifstream fs(str);

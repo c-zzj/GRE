@@ -100,6 +100,18 @@ class Benchmark {
         uint64_t scan_not_enough = 0;
     };
     typedef ThreadParam param_t;
+
+    long long create_uniform_data(KEY_TYPE *&data, long long length)
+    {
+        data = new KEY_TYPE[length];
+        for (long long i = 0; i < length; i++)
+        {
+            data[i] = i;
+        }
+        return length;
+    }
+
+
 public:
     Benchmark() {
     }
@@ -111,27 +123,30 @@ public:
         if (table_size > 0) keys = new KEY_TYPE[table_size];
 
 
-        if (keys_file_type == "binary") {
-            table_size = load_binary_data(keys, table_size, keys_file_path);
-            if (table_size <= 0) {
-                COUT_THIS("Could not open key file, please check the path of key file.");
-                exit(0);
-            }
-        } else if (keys_file_type == "text") {
-            table_size = load_text_data(keys, table_size, keys_file_path);
-            if (table_size <= 0) {
-                COUT_THIS("Could not open key file, please check the path of key file.");
-                exit(0);
-            }
-        } else {
-            COUT_THIS("Could not open key file, please check the path of key file.");
-            exit(0);
-        }
+        // if (keys_file_type == "binary") {
+        //     table_size = load_binary_data(keys, table_size, keys_file_path);
+        //     if (table_size <= 0) {
+        //         COUT_THIS("Could not open key file, please check the path of key file.");
+        //         exit(0);
+        //     }
+        // } else if (keys_file_type == "text") {
+        //     table_size = load_text_data(keys, table_size, keys_file_path);
+        //     if (table_size <= 0) {
+        //         COUT_THIS("Could not open key file, please check the path of key file.");
+        //         exit(0);
+        //     }
+        // } else {
+        //     COUT_THIS("Could not open key file, please check the path of key file.");
+        //     exit(0);
+        // }
+        size_t size = 5e9;
+        table_size = create_uniform_data(keys, size);
+        std::cout << size << " keys, uniformly distributed" << std::endl;
 
         if (!data_shift) {
-            tbb::parallel_sort(keys, keys + table_size);
-            auto last = std::unique(keys, keys + table_size);
-            table_size = last - keys;
+            // tbb::parallel_sort(keys, keys + table_size);
+            // auto last = std::unique(keys, keys + table_size);
+            // table_size = last - keys;
             std::shuffle(keys, keys + table_size, gen);
         }
 
@@ -151,10 +166,12 @@ public:
             init_keys[i] = (keys[i]);
         }
         tbb::parallel_sort(init_keys.begin(), init_keys.end());
+        std::cout << "init keys sorted" << std::endl;
 
         init_key_values = new std::pair<KEY_TYPE, PAYLOAD_TYPE>[init_keys.size()];
 #pragma omp parallel for num_threads(thread_num)
-        for (int i = 0; i < init_keys.size(); i++) {
+        for (size_t i = 0; i < init_keys.size(); i++)
+        {
             init_key_values[i].first = init_keys[i];
             init_key_values[i].second = 123456789;
         }
@@ -362,6 +379,10 @@ public:
                 if (latency_sample && i % latency_sample_interval == 0) {
                     latency_sample_end_time = tn.rdtsc();
                     thread_param.latency.push_back(std::make_pair(latency_sample_start_time, latency_sample_end_time));
+                }
+
+                if (1){
+                    std::cout << i << " ops completed" << std : endl;
                 }
             } // omp for loop
 #pragma omp master
