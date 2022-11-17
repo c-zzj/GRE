@@ -161,7 +161,7 @@ public:
         // prepare data
         COUT_THIS("prepare init keys.");
         init_keys.resize(init_table_size);
-#pragma omp parallel for num_threads(thread_num)
+#pragma omp parallel for num_threads(32)
         for (size_t i = 0; i < init_table_size; ++i) {
             init_keys[i] = (keys[i]);
         }
@@ -169,7 +169,7 @@ public:
         std::cout << "init keys sorted" << std::endl;
 
         init_key_values = new std::pair<KEY_TYPE, PAYLOAD_TYPE>[init_keys.size()];
-#pragma omp parallel for num_threads(thread_num)
+#pragma omp parallel for num_threads(32)
         for (size_t i = 0; i < init_keys.size(); i++)
         {
             init_key_values[i].first = init_keys[i];
@@ -345,6 +345,7 @@ public:
             for (auto i = 0; i < operations_num; i++) {
                 auto op = operations[i].first;
                 auto key = operations[i].second;
+                auto diff = tn.tsc2ns(tn.rdtsc()) - tn.tsc2ns(start_time);
 
                 if (latency_sample && i % latency_sample_interval == 0)
                     latency_sample_start_time = tn.rdtsc();
@@ -359,12 +360,18 @@ public:
                     //     printf("read failed, Key %lu, val %llu\n",key, val);
                     //     exit(1);
                     // }
+                    if (diff < 500000000)
+                        continue;
                     thread_param.success_read += ret;
                 } else if (op == INSERT) {  // insert
                     auto ret = index->put(key, 123456789, &paramI);
+                    if (diff < 500000000)
+                        continue;
                     thread_param.success_insert += ret;
                 } else if (op == UPDATE) {  // update
                     auto ret = index->update(key, 234567891, &paramI);
+                    if (diff < 500000000)
+                        continue;
                     thread_param.success_update += ret;
                 } else if (op == SCAN) { // scan
                     auto scan_len = index->scan(key, scan_num, scan_result, &paramI);
@@ -379,10 +386,6 @@ public:
                 if (latency_sample && i % latency_sample_interval == 0) {
                     latency_sample_end_time = tn.rdtsc();
                     thread_param.latency.push_back(std::make_pair(latency_sample_start_time, latency_sample_end_time));
-                }
-
-                if (1){
-                    std::cout << i << " ops completed" << std : endl;
                 }
             } // omp for loop
 #pragma omp master
@@ -409,7 +412,8 @@ public:
             stat.scan_not_enough += p.scan_not_enough;
         }
         // calculate throughput
-        stat.throughput = static_cast<uint64_t>(operations_num / (diff/(double) 1000000000));
+        auto success_ops = stat.success_read + stat.success_insert + stat.success_update + stat.success_remove;
+        stat.throughput = static_cast<uint64_t>(success_ops / ((diff/(double) 1000000000) - 0.5)); // throuput after 0.5 second
 
         // calculate dataset metric
         if (dataset_statistic) {
